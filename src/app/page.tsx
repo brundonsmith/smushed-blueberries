@@ -148,7 +148,7 @@ async function getContentData(): Promise<ContentData | null> {
       const fileContent = await fs.readFile(contentPath, 'utf8');
       const contentData = JSON.parse(fileContent);
       return contentData;
-    } catch (fileError) {
+    } catch {
       console.log('No smushed_content.json found locally');
       return null;
     }
@@ -196,11 +196,11 @@ async function getPosterImageDataAndColors(): Promise<{ dataUri: string; backgro
             const dataUri = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
             return {
               dataUri,
-              ...(cached as any)
+              ...(cached as { backgroundColor: string; textColor: string; accentColor: string })
             };
           }
         }
-      } catch (cacheError) {
+      } catch {
         console.log('Cache miss for image colors');
       }
 
@@ -400,7 +400,7 @@ async function fetchLinkMetadata(url: string): Promise<LinkMetadata> {
       console.log(`Using cached metadata for ${url}`);
       return cached as LinkMetadata;
     }
-  } catch (cacheError) {
+  } catch {
     console.log('Cache miss for', url);
   }
   
