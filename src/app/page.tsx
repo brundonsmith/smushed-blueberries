@@ -16,15 +16,15 @@ function getComplementaryAccent(rgb: [number, number, number]): string {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const delta = max - min;
-  
+
   if (delta === 0) {
     // Gray background - use a warm accent
     return 'rgba(180, 140, 100, 0.8)';
   }
-  
+
   // Find dominant channel and create subtle complement
   let accentR = r, accentG = g, accentB = b;
-  
+
   if (r === max) {
     // Red dominant - shift toward cyan
     accentR = Math.max(0, r - 30);
@@ -41,7 +41,7 @@ function getComplementaryAccent(rgb: [number, number, number]): string {
     accentG = Math.min(255, g + 20);
     accentB = Math.max(0, b - 30);
   }
-  
+
   return `rgba(${accentR}, ${accentG}, ${accentB}, 0.7)`;
 }
 
@@ -50,16 +50,16 @@ function extractEdgeColors(buffer: Buffer): Promise<[number, number, number]> {
     try {
       const image = sharp(buffer);
       const { width, height } = await image.metadata();
-      
+
       if (!width || !height || width < 10 || height < 10) {
         resolve([255, 255, 255]); // Default white
         return;
       }
-      
-      
+
+
       // Get corners instead of full edges to avoid extraction issues
       const cornerSize = Math.min(10, Math.min(width, height) / 4);
-      
+
       const corners = [
         // Top-left
         { left: 0, top: 0, width: cornerSize, height: cornerSize },
@@ -70,16 +70,16 @@ function extractEdgeColors(buffer: Buffer): Promise<[number, number, number]> {
         // Bottom-right
         { left: width - cornerSize, top: height - cornerSize, width: cornerSize, height: cornerSize }
       ];
-      
+
       let totalR = 0, totalG = 0, totalB = 0, totalPixels = 0;
-      
+
       for (const corner of corners) {
         try {
           const cornerBuffer = await image
             .extract(corner)
             .raw()
             .toBuffer();
-          
+
           for (let i = 0; i < cornerBuffer.length; i += 3) {
             totalR += cornerBuffer[i];
             totalG += cornerBuffer[i + 1];
@@ -91,16 +91,16 @@ function extractEdgeColors(buffer: Buffer): Promise<[number, number, number]> {
           continue;
         }
       }
-      
+
       if (totalPixels === 0) {
         resolve([255, 255, 255]); // Default white
         return;
       }
-      
+
       const avgR = Math.round(totalR / totalPixels);
       const avgG = Math.round(totalG / totalPixels);
       const avgB = Math.round(totalB / totalPixels);
-      
+
       resolve([avgR, avgG, avgB]);
     } catch (error) {
       console.error('Error extracting edge colors:', error);
@@ -109,13 +109,61 @@ function extractEdgeColors(buffer: Buffer): Promise<[number, number, number]> {
   });
 }
 
+interface ContentData {
+  instagram: string;
+  links: Array<string | { url: string; title: string; description?: string }>;
+  address: {
+    name: string;
+    address: string;
+    city: string;
+    state: string;
+    zip: string;
+  };
+}
+
+async function getContentData(): Promise<ContentData | null> {
+  try {
+    // First try to load from blob storage
+    const { blobs } = await list({ prefix: 'smushed_content' });
+
+    if (blobs.length > 0) {
+      const latestBlob = blobs.sort((a, b) =>
+        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+      )[0];
+
+      const response = await fetch(latestBlob.url);
+      if (response.ok) {
+        const contentData = await response.json();
+        return contentData;
+      }
+    }
+
+    // Fallback to local file system
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const contentPath = path.join(process.cwd(), 'smushed_content.json');
+
+    try {
+      const fileContent = await fs.readFile(contentPath, 'utf8');
+      const contentData = JSON.parse(fileContent);
+      return contentData;
+    } catch (fileError) {
+      console.log('No smushed_content.json found locally');
+      return null;
+    }
+  } catch (error) {
+    console.error('Error fetching content data:', error);
+    return null;
+  }
+}
+
 async function getPosterImageDataAndColors(): Promise<{ dataUri: string; backgroundColor: string; textColor: string; accentColor: string }> {
   try {
     const { blobs } = await list({ prefix: 'smushed_poster' });
-    
+
     let imageBuffer: Buffer;
     let contentType = 'image/png';
-    
+
     if (blobs.length === 0) {
       // Use local image as fallback
       const fs = await import('fs/promises');
@@ -124,29 +172,29 @@ async function getPosterImageDataAndColors(): Promise<{ dataUri: string; backgro
       imageBuffer = await fs.readFile(imagePath);
     } else {
       // Get the most recent blob
-      const latestBlob = blobs.sort((a, b) => 
+      const latestBlob = blobs.sort((a, b) =>
         new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
       )[0];
-      
+
       // Fetch the image
       const response = await fetch(latestBlob.url);
       if (!response.ok) {
         throw new Error(`Failed to fetch image: ${response.statusText}`);
       }
-      
+
       const arrayBuffer = await response.arrayBuffer();
       imageBuffer = Buffer.from(arrayBuffer);
       contentType = response.headers.get('content-type') || 'image/png';
     }
-    
+
     // Extract colors from the image
     const backgroundColor = await extractEdgeColors(imageBuffer);
     const textColor = getContrastingColor(backgroundColor);
     const accentColor = getComplementaryAccent(backgroundColor);
-    
+
     // Convert to data URI
     const dataUri = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
-    
+
     return {
       dataUri,
       backgroundColor: `rgb(${backgroundColor.join(', ')})`,
@@ -161,12 +209,12 @@ async function getPosterImageDataAndColors(): Promise<{ dataUri: string; backgro
       const path = await import('path');
       const imagePath = path.join(process.cwd(), 'public', 'smushed_poster.png');
       const imageBuffer = await fs.readFile(imagePath);
-      
+
       const backgroundColor = await extractEdgeColors(imageBuffer);
       const textColor = getContrastingColor(backgroundColor);
       const accentColor = getComplementaryAccent(backgroundColor);
       const dataUri = `data:image/png;base64,${imageBuffer.toString('base64')}`;
-      
+
       return {
         dataUri,
         backgroundColor: `rgb(${backgroundColor.join(', ')})`,
@@ -185,9 +233,300 @@ async function getPosterImageDataAndColors(): Promise<{ dataUri: string; backgro
   }
 }
 
+function InstagramEmbed({ username }: { username: string }) {
+  if (!username) return null;
+
+  return (
+    <div style={{ margin: '40px 0', textAlign: 'center' }}>
+      <h3 style={{ margin: '0 0 20px 0', fontSize: '1.8rem', fontWeight: 'bold' }}>
+        Follow on Instagram
+      </h3>
+      <div style={{
+        border: '1px solid #ddd',
+        borderRadius: '12px',
+        padding: '20px',
+        maxWidth: '500px',
+        margin: '0 auto',
+        backgroundColor: 'rgba(255,255,255,0.1)'
+      }}>
+        <a
+          href={`https://instagram.com/${username}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            textDecoration: 'none',
+            color: 'inherit',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px',
+            fontSize: '1.2rem'
+          }}
+        >
+          📸 @{username}
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function LinkPreviewCard({ metadata, accentColor }: {
+  metadata: LinkMetadata;
+  accentColor: string;
+}) {
+  return (
+    <div style={{
+      border: `2px solid ${accentColor}`,
+      borderRadius: '12px',
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      transition: 'transform 0.2s',
+      cursor: 'pointer',
+      padding: '24px',
+      minHeight: '160px',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      <a
+        href={metadata.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          textDecoration: 'none',
+          color: 'inherit',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%'
+        }}
+      >
+        <h4 style={{
+          margin: '0 0 12px 0',
+          fontSize: '1.3rem',
+          fontWeight: 'bold',
+          lineHeight: '1.3'
+        }}>
+          {metadata.title}
+        </h4>
+        {metadata.description && (
+          <p style={{
+            margin: '0 0 16px 0',
+            opacity: 0.8,
+            fontSize: '0.95rem',
+            lineHeight: '1.5',
+            flex: 1
+          }}>
+            {metadata.description.substring(0, 200)}{metadata.description.length > 200 ? '...' : ''}
+          </p>
+        )}
+        <div style={{
+          fontSize: '0.85rem',
+          opacity: 0.7,
+          fontWeight: '500',
+          marginTop: 'auto'
+        }}>
+          {new URL(metadata.url).hostname}
+        </div>
+      </a>
+    </div>
+  );
+}
+
+interface LinkMetadata {
+  title: string;
+  description?: string;
+  url: string;
+}
+
+async function fetchLinkMetadata(url: string): Promise<LinkMetadata> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const html = await response.text();
+
+    // Extract Open Graph and Twitter metadata with more comprehensive patterns
+    const titleMatches = [
+      html.match(/<meta\s+property="og:title"\s+content="([^"]*)"[^>]*>/i),
+      html.match(/<meta\s+name="twitter:title"\s+content="([^"]*)"[^>]*>/i),
+      html.match(/<title[^>]*>([^<]*)<\/title>/i)
+    ];
+
+    const descriptionMatches = [
+      html.match(/<meta\s+property="og:description"\s+content="([^"]*)"[^>]*>/i),
+      html.match(/<meta\s+name="twitter:description"\s+content="([^"]*)"[^>]*>/i),
+      html.match(/<meta\s+name="description"\s+content="([^"]*)"[^>]*>/i)
+    ];
+
+    const titleMatch = titleMatches.find(match => match)?.[1];
+    const descriptionMatch = descriptionMatches.find(match => match)?.[1];
+
+    // For social media, prefer our custom title extraction over scraped titles
+    const isSocialMedia = url.includes('instagram.com') || url.includes('facebook.com') || url.includes('twitter.com') || url.includes('x.com');
+
+    let title: string;
+    if (isSocialMedia) {
+      title = getDomainTitle(url);
+    } else {
+      title = titleMatch?.trim() || getDomainTitle(url);
+      // Decode HTML entities
+      title = title.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
+        .replace(/&#x([a-f\d]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)))
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'");
+    }
+
+    let description = descriptionMatch?.trim();
+    if (description) {
+      // Decode HTML entities in descriptions
+      description = description.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
+        .replace(/&#x([a-f\d]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)))
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'");
+    }
+
+    return {
+      title,
+      description,
+      url
+    };
+  } catch (error) {
+    console.error(`Error fetching metadata for ${url}:`, error);
+    return {
+      title: getDomainTitle(url),
+      url
+    };
+  }
+}
+
+function getDomainTitle(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname.replace('www.', '');
+
+    // Extract usernames for social media platforms
+    if (domain.includes('facebook.com')) {
+      const match = url.match(/facebook\.com\/(@?[\w.]+)/);
+      if (match) {
+        const username = match[1].replace('@', '');
+        return `@${username} on Facebook`;
+      }
+    }
+
+    if (domain.includes('instagram.com')) {
+      const match = url.match(/(?:www\.)?instagram\.com\/(\w+)/);
+      if (match) {
+        return `@${match[1]} on Instagram`;
+      }
+    }
+
+    if (domain.includes('twitter.com') || domain.includes('x.com')) {
+      const match = url.match(/(?:twitter|x)\.com\/(\w+)/);
+      if (match) {
+        return `@${match[1]} on X`;
+      }
+    }
+
+    if (domain.includes('linkedin.com')) {
+      const match = url.match(/linkedin\.com\/in\/([^/?]+)/);
+      if (match) {
+        return `${match[1]} on LinkedIn`;
+      }
+    }
+
+    // Default to domain name
+    return domain.charAt(0).toUpperCase() + domain.slice(1);
+  } catch {
+    return url;
+  }
+}
+
+function AddressDisplay({ addressData, accentColor }: { 
+  addressData: {
+    name: string;
+    address: string;
+    city: string;
+    state: string;
+    zip: string;
+  };
+  accentColor: string;
+}) {
+  if (!addressData) return null;
+
+  return (
+    <div style={{ margin: '40px 0' }}>
+      <h3 style={{ margin: '0 0 20px 0', fontSize: '1.8rem', fontWeight: 'bold', textAlign: 'center' }}>
+        Location
+      </h3>
+      <div style={{
+        border: `2px solid ${accentColor}`,
+        borderRadius: '12px',
+        padding: '24px',
+        maxWidth: '400px',
+        margin: '0 auto',
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        textAlign: 'center'
+      }}>
+        <address style={{
+          fontStyle: 'normal',
+          lineHeight: '1.6',
+          fontSize: '1.1rem'
+        }}>
+          <div style={{
+            fontSize: '1.3rem',
+            fontWeight: 'bold',
+            marginBottom: '12px'
+          }}>
+            {addressData.name}
+          </div>
+          <div style={{ marginBottom: '8px' }}>
+            {addressData.address}
+          </div>
+          <div>
+            {addressData.city}, {addressData.state} {addressData.zip}
+          </div>
+        </address>
+      </div>
+    </div>
+  );
+}
+
 export default async function Home() {
   const { dataUri, backgroundColor, textColor, accentColor } = await getPosterImageDataAndColors();
-  
+  const contentData = await getContentData();
+
+  // Fetch metadata for all links server-side
+  let linkMetadata: LinkMetadata[] = [];
+  if (contentData?.links) {
+    const metadataPromises = contentData.links.map(async (link) => {
+      const url = typeof link === 'string' ? link : link.url;
+      if (typeof link === 'string') {
+        return await fetchLinkMetadata(url);
+      } else {
+        return {
+          title: link.title,
+          description: link.description,
+          url: link.url
+        };
+      }
+    });
+
+    linkMetadata = await Promise.all(metadataPromises);
+  }
+
   return (
     <div style={{
       display: 'flex',
@@ -205,17 +544,17 @@ export default async function Home() {
         alignItems: 'center',
         maxWidth: '100%'
       }}>
-        <h1 style={{ 
-          margin: '0 0 16px 0', 
+        <h1 style={{
+          margin: '0 0 16px 0',
           textAlign: 'center',
           fontSize: '3.5rem',
           fontWeight: 'bold',
           color: textColor,
           textShadow: `2px 2px 4px ${accentColor}, -1px -1px 2px rgba(0,0,0,0.3)`,
           filter: `drop-shadow(0 0 6px ${accentColor})`
-        }}>Smushed Blueberries</h1>
-        <h2 style={{ 
-          margin: '0 0 32px 0', 
+        }}>Smushed Blueberries 🫐</h1>
+        <h2 style={{
+          margin: '0 0 32px 0',
           textAlign: 'center',
           fontSize: '1.5rem',
           fontStyle: 'italic',
@@ -244,6 +583,51 @@ export default async function Home() {
           }}
           priority
         />
+
+        {contentData && (
+          <>
+            {/* Instagram Section */}
+            {contentData.instagram && (
+              <InstagramEmbed username={contentData.instagram} />
+            )}
+
+            {/* Links Section */}
+            {linkMetadata.length > 0 && (
+              <div style={{ margin: '40px 0', width: '100%', maxWidth: '800px' }}>
+                <h3 style={{
+                  margin: '0 0 20px 0',
+                  fontSize: '1.8rem',
+                  fontWeight: 'bold',
+                  textAlign: 'center'
+                }}>
+                  Community links!
+                </h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: '20px',
+                  padding: '0 20px'
+                }}>
+                  {linkMetadata.map((metadata, index) => (
+                    <LinkPreviewCard
+                      key={index}
+                      metadata={metadata}
+                      accentColor={accentColor}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Address Section */}
+            {contentData.address && (
+              <AddressDisplay 
+                addressData={contentData.address} 
+                accentColor={accentColor}
+              />
+            )}
+          </>
+        )}
       </div>
     </div>
   );
