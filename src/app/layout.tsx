@@ -18,7 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={lora.className}>
+      <body className={lora.className} style={{ margin: 0, padding: 0 }}>
         {children}
       </body>
     </html>
