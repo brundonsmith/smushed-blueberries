@@ -56,9 +56,6 @@ function extractEdgeColors(buffer: Buffer): Promise<[number, number, number]> {
         return;
       }
       
-      // Use safer edge dimensions
-      const edgeHeight = Math.max(1, Math.min(20, Math.floor(height * 0.05)));
-      const edgeWidth = Math.max(1, Math.min(20, Math.floor(width * 0.05)));
       
       // Get corners instead of full edges to avoid extraction issues
       const cornerSize = Math.min(10, Math.min(width, height) / 4);
