@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { list } from '@vercel/blob';
 import sharp from 'sharp';
+import { kv } from '@vercel/kv';
 
 function getContrastingColor(rgb: [number, number, number]): string {
   const [r, g, b] = rgb;
@@ -176,6 +177,33 @@ async function getPosterImageDataAndColors(): Promise<{ dataUri: string; backgro
         new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
       )[0];
 
+      // Use blob URL as cache key (it changes when image changes)
+      const imageHash = latestBlob.url.split('/').pop()?.split('.')[0] || 'unknown';
+      const cacheKey = `image-colors:${imageHash}`;
+      
+      // Check cache first for colors
+      try {
+        const cached = await kv.get(cacheKey);
+        if (cached) {
+          console.log('Using cached image colors');
+          // Still need to fetch the image for data URI
+          const response = await fetch(latestBlob.url);
+          if (response.ok) {
+            const arrayBuffer = await response.arrayBuffer();
+            imageBuffer = Buffer.from(arrayBuffer);
+            contentType = response.headers.get('content-type') || 'image/png';
+            
+            const dataUri = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
+            return {
+              dataUri,
+              ...(cached as any)
+            };
+          }
+        }
+      } catch (cacheError) {
+        console.log('Cache miss for image colors');
+      }
+
       // Fetch the image
       const response = await fetch(latestBlob.url);
       if (!response.ok) {
@@ -185,9 +213,36 @@ async function getPosterImageDataAndColors(): Promise<{ dataUri: string; backgro
       const arrayBuffer = await response.arrayBuffer();
       imageBuffer = Buffer.from(arrayBuffer);
       contentType = response.headers.get('content-type') || 'image/png';
+      
+      // Extract colors from the image
+      const backgroundColor = await extractEdgeColors(imageBuffer);
+      const textColor = getContrastingColor(backgroundColor);
+      const accentColor = getComplementaryAccent(backgroundColor);
+      
+      // Cache the colors (but not the data URI since it's large)
+      const colorData = {
+        backgroundColor: `rgb(${backgroundColor.join(', ')})`,
+        textColor,
+        accentColor
+      };
+      
+      try {
+        await kv.set(cacheKey, colorData, { ex: 60 * 60 * 24 * 7 }); // Cache for 1 week
+        console.log('Cached image colors');
+      } catch (cacheError) {
+        console.log('Failed to cache colors:', cacheError);
+      }
+      
+      // Convert to data URI
+      const dataUri = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
+      
+      return {
+        dataUri,
+        ...colorData
+      };
     }
 
-    // Extract colors from the image
+    // For local images, extract colors normally (no caching)
     const backgroundColor = await extractEdgeColors(imageBuffer);
     const textColor = getContrastingColor(backgroundColor);
     const accentColor = getComplementaryAccent(backgroundColor);
@@ -337,6 +392,18 @@ interface LinkMetadata {
 }
 
 async function fetchLinkMetadata(url: string): Promise<LinkMetadata> {
+  // Check cache first
+  const cacheKey = `link-metadata:${url}`;
+  try {
+    const cached = await kv.get(cacheKey);
+    if (cached) {
+      console.log(`Using cached metadata for ${url}`);
+      return cached as LinkMetadata;
+    }
+  } catch (cacheError) {
+    console.log('Cache miss for', url);
+  }
+  
   try {
     const response = await fetch(url, {
       headers: {
@@ -344,6 +411,7 @@ async function fetchLinkMetadata(url: string): Promise<LinkMetadata> {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
       },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
     });
 
     if (!response.ok) {
@@ -398,17 +466,36 @@ async function fetchLinkMetadata(url: string): Promise<LinkMetadata> {
         .replace(/&#039;/g, "'");
     }
 
-    return {
+    const result = {
       title,
       description,
       url
     };
+    
+    // Cache the result
+    try {
+      await kv.set(cacheKey, result, { ex: 60 * 60 * 24 * 3 }); // Cache for 3 days
+      console.log(`Cached metadata for ${url}`);
+    } catch (cacheError) {
+      console.log('Failed to cache metadata:', cacheError);
+    }
+    
+    return result;
   } catch (error) {
     console.error(`Error fetching metadata for ${url}:`, error);
-    return {
+    const fallback = {
       title: getDomainTitle(url),
       url
     };
+    
+    // Cache fallback for shorter time to retry sooner
+    try {
+      await kv.set(cacheKey, fallback, { ex: 60 * 60 }); // Cache for 1 hour
+    } catch (cacheError) {
+      console.log('Failed to cache fallback metadata:', cacheError);
+    }
+    
+    return fallback;
   }
 }
 
