@@ -573,11 +573,18 @@ function AddressDisplay({ addressData, accentColor }: {
           fontSize: '1.1rem'
         }}>
           <div style={{
-            fontSize: '1.3rem',
-            fontWeight: 'bold',
-            marginBottom: '12px'
+            marginBottom: '8px'
           }}>
-            {addressData.name}
+            <img 
+              src="/epoch_logo.png" 
+              alt={addressData.name}
+              style={{
+                maxHeight: '80px',
+                maxWidth: '300px',
+                height: 'auto',
+                width: 'auto'
+              }}
+            />
           </div>
           <div style={{ marginBottom: '8px' }}>
             {addressData.address}
