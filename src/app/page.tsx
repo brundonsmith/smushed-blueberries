@@ -46,68 +46,64 @@ function getComplementaryAccent(rgb: [number, number, number]): string {
   return `rgba(${accentR}, ${accentG}, ${accentB}, 0.7)`;
 }
 
-function extractEdgeColors(buffer: Buffer): Promise<[number, number, number]> {
-  return new Promise(async (resolve) => {
-    try {
-      const image = sharp(buffer);
-      const { width, height } = await image.metadata();
+async function extractEdgeColors(buffer: Buffer): Promise<[number, number, number]> {
+  try {
+    const image = sharp(buffer);
+    const { width, height } = await image.metadata();
 
-      if (!width || !height || width < 10 || height < 10) {
-        resolve([255, 255, 255]); // Default white
-        return;
-      }
-
-
-      // Get corners instead of full edges to avoid extraction issues
-      const cornerSize = Math.floor(Math.min(10, Math.min(width, height) / 4));
-
-      const corners = [
-        // Top-left
-        { left: 0, top: 0, width: cornerSize, height: cornerSize },
-        // Top-right
-        { left: Math.floor(width - cornerSize), top: 0, width: cornerSize, height: cornerSize },
-        // Bottom-left
-        { left: 0, top: Math.floor(height - cornerSize), width: cornerSize, height: cornerSize },
-        // Bottom-right
-        { left: Math.floor(width - cornerSize), top: Math.floor(height - cornerSize), width: cornerSize, height: cornerSize }
-      ];
-
-      let totalR = 0, totalG = 0, totalB = 0, totalPixels = 0;
-
-      for (const corner of corners) {
-        try {
-          const cornerBuffer = await image
-            .extract(corner)
-            .raw()
-            .toBuffer();
-
-          for (let i = 0; i < cornerBuffer.length; i += 3) {
-            totalR += cornerBuffer[i];
-            totalG += cornerBuffer[i + 1];
-            totalB += cornerBuffer[i + 2];
-            totalPixels++;
-          }
-        } catch (cornerError) {
-          console.warn('Error extracting corner:', cornerError);
-          continue;
-        }
-      }
-
-      if (totalPixels === 0) {
-        resolve([255, 255, 255]); // Default white
-        return;
-      }
-
-      const avgR = Math.round(totalR / totalPixels);
-      const avgG = Math.round(totalG / totalPixels);
-      const avgB = Math.round(totalB / totalPixels);
-
-      resolve([avgR, avgG, avgB]);
-    } catch (error) {
-      console.error('Error extracting edge colors:', error);
-      resolve([255, 255, 255]); // Default white
+    if (!width || !height || width < 10 || height < 10) {
+      return [255, 255, 255]; // Default white
     }
-  });
+
+
+    // Get corners instead of full edges to avoid extraction issues
+    const cornerSize = Math.floor(Math.min(10, Math.min(width, height) / 4));
+
+    const corners = [
+      // Top-left
+      { left: 0, top: 0, width: cornerSize, height: cornerSize },
+      // Top-right
+      { left: Math.floor(width - cornerSize), top: 0, width: cornerSize, height: cornerSize },
+      // Bottom-left
+      { left: 0, top: Math.floor(height - cornerSize), width: cornerSize, height: cornerSize },
+      // Bottom-right
+      { left: Math.floor(width - cornerSize), top: Math.floor(height - cornerSize), width: cornerSize, height: cornerSize }
+    ];
+
+    let totalR = 0, totalG = 0, totalB = 0, totalPixels = 0;
+
+    for (const corner of corners) {
+      try {
+        const cornerBuffer = await image
+          .extract(corner)
+          .raw()
+          .toBuffer();
+
+        for (let i = 0; i < cornerBuffer.length; i += 3) {
+          totalR += cornerBuffer[i];
+          totalG += cornerBuffer[i + 1];
+          totalB += cornerBuffer[i + 2];
+          totalPixels++;
+        }
+      } catch (cornerError) {
+        console.warn('Error extracting corner:', cornerError);
+        continue;
+      }
+    }
+
+    if (totalPixels === 0) {
+      return [255, 255, 255]; // Default white
+    }
+
+    const avgR = Math.round(totalR / totalPixels);
+    const avgG = Math.round(totalG / totalPixels);
+    const avgB = Math.round(totalB / totalPixels);
+
+    return [avgR, avgG, avgB];
+  } catch (error) {
+    console.error('Error extracting edge colors:', error);
+    return [255, 255, 255]; // Default white
+  }
 }
 
 interface ContentData {
