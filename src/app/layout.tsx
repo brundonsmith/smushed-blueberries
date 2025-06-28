@@ -10,11 +10,7 @@ export const metadata: Metadata = {
   title: "Smushed Blueberries",
   description: "Stories, poems, and other juice - a creative writing community",
   icons: {
-    icon: [
-      { url: '/icon.svg', type: 'image/svg+xml' },
-      { url: '/favicon.ico', sizes: 'any' }
-    ],
-    apple: '/apple-icon.png'
+    icon: { url: '/icon.svg', type: 'image/svg+xml' }
   }
 };
 
