@@ -104,6 +104,11 @@ async function extractEdgeColors(buffer: Buffer): Promise<[number, number, numbe
     }
 }
 
+export async function getPosterUrl(): Promise<string> {
+    const { blobs } = await list({ prefix: 'smushed_poster.png' });
+    return blobs[0]!.url;
+}
+
 export async function getPosterImageDataAndColors(): Promise<{ dataUri: string; backgroundColor: string; textColor: string; accentColor: string }> {
     const { blobs } = await list({ prefix: 'smushed_poster.png' });
     const response = await fetch(blobs[0]!.url);

@@ -1,18 +1,42 @@
 import type { Metadata } from "next";
 import { Lora } from "next/font/google";
+import { getPosterUrl } from "./poster";
 
 const lora = Lora({
   subsets: ["latin"],
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "Smushed Blueberries",
-  description: "Stories, poems, and other juice - a creative writing community",
-  icons: {
-    icon: { url: '/icon.svg', type: 'image/svg+xml' }
-  }
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const posterUrl = await getPosterUrl();
+  
+  return {
+    title: "Smushed Blueberries",
+    description: "Stories, poems, and other juice - a creative writing community",
+    icons: {
+      icon: { url: '/icon.svg', type: 'image/svg+xml' }
+    },
+    openGraph: {
+      title: "Smushed Blueberries",
+      description: "Stories, poems, and other juice - a creative writing community",
+      images: [
+        {
+          url: posterUrl,
+          width: 800,
+          height: 1200,
+          alt: "Smushed Blueberries Poster"
+        }
+      ],
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: "Smushed Blueberries",
+      description: "Stories, poems, and other juice - a creative writing community",
+      images: [posterUrl],
+    }
+  };
+}
 
 export default function RootLayout({
   children,
