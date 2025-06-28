@@ -119,7 +119,7 @@ function LinkPreviewCard({ metadata, accentColor }: {
 }
 
 interface LinkMetadata {
-  title: string;
+  title?: string;
   description?: string;
   url: string;
 }
@@ -336,21 +336,20 @@ function AddressDisplay({ addressData, accentColor }: {
 export default async function Home() {
   const { dataUri, backgroundColor, textColor, accentColor } = await getPosterImageDataAndColors();
   const contentData = await getContentData();
+  console.log(contentData)
 
   // Fetch metadata for all links server-side
   let linkMetadata: LinkMetadata[] = [];
   if (contentData?.links) {
     const metadataPromises = contentData.links.map(async (link) => {
-      const url = typeof link === 'string' ? link : link.url;
-      if (typeof link === 'string') {
-        return await fetchLinkMetadata(url);
-      } else {
-        return {
-          title: link.title,
-          description: link.description,
-          url: link.url
-        };
-      }
+      const normalized = typeof link === 'string' ? { url: link, title: undefined, description: undefined } : link
+      const scraped = await fetchLinkMetadata(normalized.url);
+
+      return {
+        title: normalized.title || scraped.title,
+        description: normalized.description || scraped.description,
+        url: normalized.url
+      };
     });
 
     linkMetadata = await Promise.all(metadataPromises);

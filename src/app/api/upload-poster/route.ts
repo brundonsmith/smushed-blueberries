@@ -36,22 +36,23 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
 
     const blob = await put('smushed_poster.png', buffer, {
+      allowOverwrite: true,
       access: 'public',
       contentType: file.type,
     });
 
     console.log('Uploaded new poster:', blob.url);
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       url: blob.url,
-      message: 'Poster uploaded successfully' 
+      message: 'Poster uploaded successfully'
     });
 
   } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json(
-      { error: 'Upload failed' }, 
+      { error: 'Upload failed' },
       { status: 500 }
     );
   }

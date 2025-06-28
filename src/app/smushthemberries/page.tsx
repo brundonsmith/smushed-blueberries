@@ -1,5 +1,6 @@
 import { getPosterImageDataAndColors } from '../poster';
 import UploadComponent from './UploadComponent';
+import LinksEditor from './LinksEditor';
 
 export default async function SmushThemBerries() {
   const { backgroundColor, textColor } = await getPosterImageDataAndColors();
@@ -27,7 +28,7 @@ export default async function SmushThemBerries() {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          maxWidth: '600px',
+          maxWidth: '800px',
           width: '100%'
         }}>
           <h1 style={{
@@ -40,6 +41,7 @@ export default async function SmushThemBerries() {
           </h1>
 
           <UploadComponent />
+          <LinksEditor />
         </div>
       </div>
     </>
