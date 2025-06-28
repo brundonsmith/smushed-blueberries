@@ -177,32 +177,7 @@ async function getPosterImageDataAndColors(): Promise<{ dataUri: string; backgro
         new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
       )[0];
 
-      // Use blob URL as cache key (it changes when image changes)
-      const imageHash = latestBlob.url.split('/').pop()?.split('.')[0] || 'unknown';
-      const cacheKey = `image-colors:${imageHash}`;
-      
-      // Check cache first for colors
-      try {
-        const cached = await kv.get(cacheKey);
-        if (cached) {
-          console.log('Using cached image colors');
-          // Still need to fetch the image for data URI
-          const response = await fetch(latestBlob.url);
-          if (response.ok) {
-            const arrayBuffer = await response.arrayBuffer();
-            imageBuffer = Buffer.from(arrayBuffer);
-            contentType = response.headers.get('content-type') || 'image/png';
-            
-            const dataUri = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
-            return {
-              dataUri,
-              ...(cached as { backgroundColor: string; textColor: string; accentColor: string })
-            };
-          }
-        }
-      } catch {
-        console.log('Cache miss for image colors');
-      }
+      // Color caching disabled
 
       // Fetch the image
       const response = await fetch(latestBlob.url);
@@ -226,12 +201,7 @@ async function getPosterImageDataAndColors(): Promise<{ dataUri: string; backgro
         accentColor
       };
       
-      try {
-        await kv.set(cacheKey, colorData, { ex: 60 * 60 * 24 * 7 }); // Cache for 1 week
-        console.log('Cached image colors');
-      } catch (cacheError) {
-        console.log('Failed to cache colors:', cacheError);
-      }
+      // Color caching disabled
       
       // Convert to data URI
       const dataUri = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
