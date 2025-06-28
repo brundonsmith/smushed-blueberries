@@ -123,139 +123,40 @@ interface ContentData {
 }
 
 async function getContentData(): Promise<ContentData | null> {
-  try {
-    // First try to load from blob storage
-    const { blobs } = await list({ prefix: 'smushed_content' });
-
-    if (blobs.length > 0) {
-      const latestBlob = blobs.sort((a, b) =>
-        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-      )[0];
-
-      const response = await fetch(latestBlob.url);
-      if (response.ok) {
-        const contentData = await response.json();
-        return contentData;
-      }
-    }
-
-    // Fallback to local file system
-    const fs = await import('fs/promises');
-    const path = await import('path');
-    const contentPath = path.join(process.cwd(), 'smushed_content.json');
-
-    try {
-      const fileContent = await fs.readFile(contentPath, 'utf8');
-      const contentData = JSON.parse(fileContent);
-      return contentData;
-    } catch {
-      console.log('No smushed_content.json found locally');
-      return null;
-    }
-  } catch (error) {
-    console.error('Error fetching content data:', error);
-    return null;
-  }
+  const { blobs } = await list({ prefix: 'smushed_content.json' });
+  const response = await fetch(blobs[0]!.url);
+  return await response.json()
 }
 
 async function getPosterImageDataAndColors(): Promise<{ dataUri: string; backgroundColor: string; textColor: string; accentColor: string }> {
-  try {
-    const { blobs } = await list({ prefix: 'smushed_poster' });
+  const { blobs } = await list({ prefix: 'smushed_poster.png' });
+  const response = await fetch(blobs[0]!.url);
 
-    let imageBuffer: Buffer;
-    let contentType = 'image/png';
+  const arrayBuffer = await response.arrayBuffer();
+  const imageBuffer = Buffer.from(arrayBuffer);
+  const contentType = response.headers.get('content-type') || 'image/png';
 
-    if (blobs.length === 0) {
-      // Use local image as fallback
-      const fs = await import('fs/promises');
-      const path = await import('path');
-      const imagePath = path.join(process.cwd(), 'public', 'smushed_poster.png');
-      imageBuffer = await fs.readFile(imagePath);
-    } else {
-      // Get the most recent blob
-      const latestBlob = blobs.sort((a, b) =>
-        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-      )[0];
+  // Extract colors from the image
+  const backgroundColor = await extractEdgeColors(imageBuffer);
+  const textColor = getContrastingColor(backgroundColor);
+  const accentColor = getComplementaryAccent(backgroundColor);
 
-      // Color caching disabled
+  // Cache the colors (but not the data URI since it's large)
+  const colorData = {
+    backgroundColor: `rgb(${backgroundColor.join(', ')})`,
+    textColor,
+    accentColor
+  };
 
-      // Fetch the image
-      const response = await fetch(latestBlob.url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch image: ${response.statusText}`);
-      }
+  // Color caching disabled
 
-      const arrayBuffer = await response.arrayBuffer();
-      imageBuffer = Buffer.from(arrayBuffer);
-      contentType = response.headers.get('content-type') || 'image/png';
-      
-      // Extract colors from the image
-      const backgroundColor = await extractEdgeColors(imageBuffer);
-      const textColor = getContrastingColor(backgroundColor);
-      const accentColor = getComplementaryAccent(backgroundColor);
-      
-      // Cache the colors (but not the data URI since it's large)
-      const colorData = {
-        backgroundColor: `rgb(${backgroundColor.join(', ')})`,
-        textColor,
-        accentColor
-      };
-      
-      // Color caching disabled
-      
-      // Convert to data URI
-      const dataUri = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
-      
-      return {
-        dataUri,
-        ...colorData
-      };
-    }
+  // Convert to data URI
+  const dataUri = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
 
-    // For local images, extract colors normally (no caching)
-    const backgroundColor = await extractEdgeColors(imageBuffer);
-    const textColor = getContrastingColor(backgroundColor);
-    const accentColor = getComplementaryAccent(backgroundColor);
-
-    // Convert to data URI
-    const dataUri = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
-
-    return {
-      dataUri,
-      backgroundColor: `rgb(${backgroundColor.join(', ')})`,
-      textColor,
-      accentColor
-    };
-  } catch (error) {
-    console.error('Error processing image:', error);
-    // Fallback to local image
-    try {
-      const fs = await import('fs/promises');
-      const path = await import('path');
-      const imagePath = path.join(process.cwd(), 'public', 'smushed_poster.png');
-      const imageBuffer = await fs.readFile(imagePath);
-
-      const backgroundColor = await extractEdgeColors(imageBuffer);
-      const textColor = getContrastingColor(backgroundColor);
-      const accentColor = getComplementaryAccent(backgroundColor);
-      const dataUri = `data:image/png;base64,${imageBuffer.toString('base64')}`;
-
-      return {
-        dataUri,
-        backgroundColor: `rgb(${backgroundColor.join(', ')})`,
-        textColor,
-        accentColor
-      };
-    } catch (fallbackError) {
-      console.error('Fallback image also failed:', fallbackError);
-      return {
-        dataUri: '/smushed_poster.png',
-        backgroundColor: 'white',
-        textColor: '#2c2c2c',
-        accentColor: 'rgba(180, 140, 100, 0.8)'
-      };
-    }
-  }
+  return {
+    dataUri,
+    ...colorData
+  };
 }
 
 function InstagramEmbed({ username }: { username: string }) {
@@ -373,7 +274,7 @@ async function fetchLinkMetadata(url: string): Promise<LinkMetadata> {
   } catch {
     console.log('Cache miss for', url);
   }
-  
+
   try {
     const response = await fetch(url, {
       headers: {
@@ -441,7 +342,7 @@ async function fetchLinkMetadata(url: string): Promise<LinkMetadata> {
       description,
       url
     };
-    
+
     // Cache the result
     try {
       await kv.set(cacheKey, result, { ex: 60 * 60 * 24 * 3 }); // Cache for 3 days
@@ -449,7 +350,7 @@ async function fetchLinkMetadata(url: string): Promise<LinkMetadata> {
     } catch (cacheError) {
       console.log('Failed to cache metadata:', cacheError);
     }
-    
+
     return result;
   } catch (error) {
     console.error(`Error fetching metadata for ${url}:`, error);
@@ -457,14 +358,14 @@ async function fetchLinkMetadata(url: string): Promise<LinkMetadata> {
       title: getDomainTitle(url),
       url
     };
-    
+
     // Cache fallback for shorter time to retry sooner
     try {
       await kv.set(cacheKey, fallback, { ex: 60 * 60 }); // Cache for 1 hour
     } catch (cacheError) {
       console.log('Failed to cache fallback metadata:', cacheError);
     }
-    
+
     return fallback;
   }
 }
@@ -511,7 +412,7 @@ function getDomainTitle(url: string): string {
   }
 }
 
-function AddressDisplay({ addressData, accentColor }: { 
+function AddressDisplay({ addressData, accentColor }: {
   addressData: {
     name: string;
     address: string;
@@ -545,8 +446,8 @@ function AddressDisplay({ addressData, accentColor }: {
           <div style={{
             marginBottom: '8px'
           }}>
-            <img 
-              src="/epoch_logo.png" 
+            <img
+              src="/epoch_logo.png"
               alt={addressData.name}
               style={{
                 maxHeight: '80px',
@@ -685,8 +586,8 @@ export default async function Home() {
 
             {/* Address Section */}
             {contentData.address && (
-              <AddressDisplay 
-                addressData={contentData.address} 
+              <AddressDisplay
+                addressData={contentData.address}
                 accentColor={accentColor}
               />
             )}
