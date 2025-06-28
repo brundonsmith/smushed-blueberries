@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { list } from '@vercel/blob';
 import { kv } from '@vercel/kv';
-import { extractEdgeColors, getContrastingColor, getComplementaryAccent } from "./colors";
+import { getPosterImageDataAndColors } from "./poster";
 
 interface ContentData {
   instagram: string;
@@ -19,37 +19,6 @@ async function getContentData(): Promise<ContentData | null> {
   const { blobs } = await list({ prefix: 'smushed_content.json' });
   const response = await fetch(blobs[0]!.url);
   return await response.json()
-}
-
-async function getPosterImageDataAndColors(): Promise<{ dataUri: string; backgroundColor: string; textColor: string; accentColor: string }> {
-  const { blobs } = await list({ prefix: 'smushed_poster.png' });
-  const response = await fetch(blobs[0]!.url);
-
-  const arrayBuffer = await response.arrayBuffer();
-  const imageBuffer = Buffer.from(arrayBuffer);
-  const contentType = response.headers.get('content-type') || 'image/png';
-
-  // Extract colors from the image
-  const backgroundColor = await extractEdgeColors(imageBuffer);
-  const textColor = getContrastingColor(backgroundColor);
-  const accentColor = getComplementaryAccent(backgroundColor);
-
-  // Cache the colors (but not the data URI since it's large)
-  const colorData = {
-    backgroundColor: `rgb(${backgroundColor.join(', ')})`,
-    textColor,
-    accentColor
-  };
-
-  // Color caching disabled
-
-  // Convert to data URI
-  const dataUri = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
-
-  return {
-    dataUri,
-    ...colorData
-  };
 }
 
 function InstagramEmbed({ username }: { username: string }) {
@@ -392,7 +361,8 @@ export default async function Home() {
       <style dangerouslySetInnerHTML={{
         __html: `
           html, body {
-            background-color: ${backgroundColor} !important;
+            background-color: ${backgroundColor};
+            color: ${textColor}
           }
         `
       }} />
@@ -403,8 +373,6 @@ export default async function Home() {
         minHeight: '100vh',
         padding: '20px',
         boxSizing: 'border-box',
-        backgroundColor,
-        color: textColor
       }}>
         <div style={{
           display: 'flex',
