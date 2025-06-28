@@ -442,9 +442,11 @@ function AddressDisplay({ addressData, accentColor }: {
           <div style={{
             marginBottom: '8px'
           }}>
-            <img
+            <Image
               src="/epoch_logo.png"
               alt={addressData.name}
+              width={300}
+              height={80}
               style={{
                 maxHeight: '80px',
                 maxWidth: '300px',
@@ -489,16 +491,24 @@ export default async function Home() {
   }
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      minHeight: '100vh',
-      padding: '20px',
-      boxSizing: 'border-box',
-      backgroundColor,
-      color: textColor
-    }}>
+    <>
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          html, body {
+            background-color: ${backgroundColor} !important;
+          }
+        `
+      }} />
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        minHeight: '100vh',
+        padding: '20px',
+        boxSizing: 'border-box',
+        backgroundColor,
+        color: textColor
+      }}>
       <div style={{
         display: 'flex',
         flexDirection: 'column',
@@ -591,5 +601,6 @@ export default async function Home() {
         )}
       </div>
     </div>
+    </>
   );
 }
