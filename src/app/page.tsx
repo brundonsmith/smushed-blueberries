@@ -59,17 +59,17 @@ function extractEdgeColors(buffer: Buffer): Promise<[number, number, number]> {
 
 
       // Get corners instead of full edges to avoid extraction issues
-      const cornerSize = Math.min(10, Math.min(width, height) / 4);
+      const cornerSize = Math.floor(Math.min(10, Math.min(width, height) / 4));
 
       const corners = [
         // Top-left
         { left: 0, top: 0, width: cornerSize, height: cornerSize },
         // Top-right
-        { left: width - cornerSize, top: 0, width: cornerSize, height: cornerSize },
+        { left: Math.floor(width - cornerSize), top: 0, width: cornerSize, height: cornerSize },
         // Bottom-left
-        { left: 0, top: height - cornerSize, width: cornerSize, height: cornerSize },
+        { left: 0, top: Math.floor(height - cornerSize), width: cornerSize, height: cornerSize },
         // Bottom-right
-        { left: width - cornerSize, top: height - cornerSize, width: cornerSize, height: cornerSize }
+        { left: Math.floor(width - cornerSize), top: Math.floor(height - cornerSize), width: cornerSize, height: cornerSize }
       ];
 
       let totalR = 0, totalG = 0, totalB = 0, totalPixels = 0;
