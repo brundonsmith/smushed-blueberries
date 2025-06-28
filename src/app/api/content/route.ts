@@ -1,17 +1,6 @@
+import { isValid } from '@/app/secret';
 import { put, list } from '@vercel/blob';
 import { NextRequest, NextResponse } from 'next/server';
-
-interface ContentData {
-  instagram: string;
-  links: Array<string | { url: string; title: string; description?: string }>;
-  address: {
-    name: string;
-    address: string;
-    city: string;
-    state: string;
-    zip: string;
-  };
-}
 
 // GET - Read current content
 export async function GET() {
@@ -39,7 +28,13 @@ export async function GET() {
 // PUT - Update content
 export async function PUT(request: NextRequest) {
   try {
-    const updatedContent: ContentData = await request.json();
+    const body = await request.json();
+    const { content: updatedContent, secret } = body;
+
+    // Verify access secret
+    if (!isValid(secret)) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
 
     // Validate the content structure
     if (!updatedContent.links || !Array.isArray(updatedContent.links)) {

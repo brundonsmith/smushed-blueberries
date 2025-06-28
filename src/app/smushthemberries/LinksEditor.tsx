@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from 'react';
 
+interface LinksEditorProps {
+  secret: string;
+}
+
 interface LinkItem {
   url: string;
   title: string;
@@ -20,7 +24,7 @@ interface ContentData {
   };
 }
 
-export default function LinksEditor() {
+export default function LinksEditor({ secret }: LinksEditorProps) {
   const [contentData, setContentData] = useState<ContentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -60,7 +64,7 @@ export default function LinksEditor() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(contentData),
+        body: JSON.stringify({ content: contentData, secret }),
       });
 
       if (response.ok) {

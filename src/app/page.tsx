@@ -336,7 +336,6 @@ function AddressDisplay({ addressData, accentColor }: {
 export default async function Home() {
   const { dataUri, backgroundColor, textColor, accentColor } = await getPosterImageDataAndColors();
   const contentData = await getContentData();
-  console.log(contentData)
 
   // Fetch metadata for all links server-side
   let linkMetadata: LinkMetadata[] = [];

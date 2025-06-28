@@ -1,3 +1,4 @@
+import { isValid } from '@/app/secret';
 import { put, del, list } from '@vercel/blob';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -5,6 +6,12 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('image') as File;
+    const secret = formData.get('secret') as string;
+
+    // Verify access secret
+    if (!isValid(secret)) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });

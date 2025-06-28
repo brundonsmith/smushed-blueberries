@@ -1,6 +1,5 @@
 import { getPosterImageDataAndColors } from '../poster';
-import UploadComponent from './UploadComponent';
-import LinksEditor from './LinksEditor';
+import AdminContent from './AdminContent';
 
 export default async function SmushThemBerries() {
   const { backgroundColor, textColor } = await getPosterImageDataAndColors();
@@ -40,8 +39,7 @@ export default async function SmushThemBerries() {
             Hi Meg! :)
           </h1>
 
-          <UploadComponent />
-          <LinksEditor />
+          <AdminContent />
         </div>
       </div>
     </>

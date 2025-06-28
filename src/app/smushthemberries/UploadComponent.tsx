@@ -2,7 +2,11 @@
 
 import { useState } from 'react';
 
-export default function UploadComponent() {
+interface UploadComponentProps {
+  secret: string;
+}
+
+export default function UploadComponent({ secret }: UploadComponentProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string>('');
 
@@ -16,6 +20,7 @@ export default function UploadComponent() {
     try {
       const formData = new FormData();
       formData.append('image', file);
+      formData.append('secret', secret);
 
       const response = await fetch('/api/upload-poster', {
         method: 'POST',
