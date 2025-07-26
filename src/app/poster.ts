@@ -110,9 +110,12 @@ export async function getPosterUrl(): Promise<string> {
 }
 
 export async function getPosterImageDataAndColors(): Promise<{ dataUri: string; backgroundColor: string; textColor: string; accentColor: string }> {
+    const start = Date.now()
     const { blobs } = await list({ prefix: 'smushed_poster.png' });
     const response = await fetch(blobs[0]!.url);
+    console.log('Poster image loaded in ' + (Date.now() - start) + 'ms')
 
+    const start2 = Date.now()
     const arrayBuffer = await response.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
     const contentType = response.headers.get('content-type') || 'image/png';
@@ -133,6 +136,8 @@ export async function getPosterImageDataAndColors(): Promise<{ dataUri: string; 
 
     // Convert to data URI
     const dataUri = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
+
+    console.log('Poster image processed in ' + (Date.now() - start2) + 'ms')
 
     return {
         dataUri,

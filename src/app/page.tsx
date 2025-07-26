@@ -1,6 +1,5 @@
 import Image from "next/image";
-import { list } from '@vercel/blob';
-import { kv } from '@vercel/kv';
+import { list, put } from '@vercel/blob';
 import { getPosterImageDataAndColors } from "./poster";
 
 // Force dynamic rendering
@@ -128,17 +127,6 @@ interface LinkMetadata {
 }
 
 async function fetchLinkMetadata(url: string): Promise<LinkMetadata> {
-  // Check cache first
-  const cacheKey = `link-metadata:${url}`;
-  try {
-    const cached = await kv.get(cacheKey);
-    if (cached) {
-      console.log(`Using cached metadata for ${url}`);
-      return cached as LinkMetadata;
-    }
-  } catch {
-    console.log('Cache miss for', url);
-  }
 
   try {
     const response = await fetch(url, {
@@ -202,36 +190,68 @@ async function fetchLinkMetadata(url: string): Promise<LinkMetadata> {
         .replace(/&#039;/g, "'");
     }
 
-    const result = {
+    return {
       title,
       description,
       url
     };
-
-    // Cache the result
-    try {
-      await kv.set(cacheKey, result, { ex: 60 * 60 * 24 * 3 }); // Cache for 3 days
-      console.log(`Cached metadata for ${url}`);
-    } catch (cacheError) {
-      console.log('Failed to cache metadata:', cacheError);
-    }
-
-    return result;
   } catch (error) {
     console.error(`Error fetching metadata for ${url}:`, error);
-    const fallback = {
+    return {
       title: getDomainTitle(url),
       url
     };
+  }
+}
 
-    // Cache fallback for shorter time to retry sooner
-    try {
-      await kv.set(cacheKey, fallback, { ex: 60 * 60 }); // Cache for 1 hour
-    } catch (cacheError) {
-      console.log('Failed to cache fallback metadata:', cacheError);
+interface CachedLinkMetadata {
+  timestamp: number;
+  data: LinkMetadata[];
+}
+
+async function getCachedLinkMetadata(): Promise<LinkMetadata[] | null> {
+  try {
+    const { blobs } = await list({ prefix: 'link_metadata.json' });
+    if (blobs.length === 0) {
+      return null;
     }
 
-    return fallback;
+    const response = await fetch(blobs[0].url);
+    const cached: CachedLinkMetadata = await response.json();
+
+    // Check if cache is expired (24 hours)
+    const cacheAge = Date.now() - cached.timestamp;
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+    if (cacheAge > maxAge) {
+      console.log('Link metadata cache expired');
+      return null;
+    }
+
+    console.log('Using cached link metadata');
+    return cached.data;
+  } catch (error) {
+    console.log('Failed to load cached link metadata:', error);
+    return null;
+  }
+}
+
+async function saveLinkMetadataCache(metadata: LinkMetadata[]): Promise<void> {
+  try {
+    const cacheData: CachedLinkMetadata = {
+      timestamp: Date.now(),
+      data: metadata
+    };
+
+    const json = JSON.stringify(cacheData);
+    await put('link_metadata.json', json, {
+      access: 'public',
+      contentType: 'application/json'
+    });
+
+    console.log('Saved link metadata cache');
+  } catch (error) {
+    console.log('Failed to save link metadata cache:', error);
   }
 }
 
@@ -340,21 +360,36 @@ export default async function Home() {
   const { dataUri, backgroundColor, textColor, accentColor } = await getPosterImageDataAndColors();
   const contentData = await getContentData();
 
-  // Fetch metadata for all links server-side
+  // Fetch metadata for all links server-side with caching
   let linkMetadata: LinkMetadata[] = [];
+
   if (contentData?.links) {
-    const metadataPromises = contentData.links.map(async (link) => {
-      const normalized = typeof link === 'string' ? { url: link, title: undefined, description: undefined } : link
-      const scraped = await fetchLinkMetadata(normalized.url);
+    // Try to load from cache first
+    const cachedMetadata = await getCachedLinkMetadata();
 
-      return {
-        title: normalized.title || scraped.title,
-        description: normalized.description || scraped.description,
-        url: normalized.url
-      };
-    });
+    if (cachedMetadata && cachedMetadata.length === contentData.links.length) {
+      // Use cached data if available and matches current links count
+      linkMetadata = cachedMetadata;
+      console.log('Using cached link metadata');
+    } else {
+      // Fetch fresh data
+      console.log('Fetching fresh link metadata...');
+      const metadataPromises = contentData.links.map(async (link) => {
+        const normalized = typeof link === 'string' ? { url: link, title: undefined, description: undefined } : link
+        const scraped = await fetchLinkMetadata(normalized.url);
 
-    linkMetadata = await Promise.all(metadataPromises);
+        return {
+          title: normalized.title || scraped.title,
+          description: normalized.description || scraped.description,
+          url: normalized.url
+        };
+      });
+
+      linkMetadata = await Promise.all(metadataPromises);
+
+      // Save to cache
+      await saveLinkMetadataCache(linkMetadata);
+    }
   }
 
   return (
