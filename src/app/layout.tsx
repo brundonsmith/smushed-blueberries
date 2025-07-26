@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Lora } from "next/font/google";
 import { getPosterUrl } from "./poster";
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 const lora = Lora({
   subsets: ["latin"],
   display: "swap",

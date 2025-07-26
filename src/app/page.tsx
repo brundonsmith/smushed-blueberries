@@ -3,6 +3,9 @@ import { list } from '@vercel/blob';
 import { kv } from '@vercel/kv';
 import { getPosterImageDataAndColors } from "./poster";
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 interface ContentData {
   instagram: string;
   links: Array<string | { url: string; title: string; description?: string }>;
