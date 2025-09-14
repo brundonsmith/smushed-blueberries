@@ -1,27 +1,11 @@
 import Image from "next/image";
-import { list, put } from '@vercel/blob';
-import { getPosterImageDataAndColors } from "./poster";
+import { getPosterImageColors } from "./poster";
+
+import contentData from '../../smushed_content.json'
+import { headers } from "next/headers";
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
-
-interface ContentData {
-  instagram: string;
-  links: Array<string | { url: string; title: string; description?: string }>;
-  address: {
-    name: string;
-    address: string;
-    city: string;
-    state: string;
-    zip: string;
-  };
-}
-
-async function getContentData(): Promise<ContentData | null> {
-  const { blobs } = await list({ prefix: 'smushed_content.json' });
-  const response = await fetch(blobs[0]!.url);
-  return await response.json()
-}
 
 function InstagramEmbed({ username }: { username: string }) {
   if (!username) return null;
@@ -120,182 +104,7 @@ function LinkPreviewCard({ metadata, accentColor }: {
   );
 }
 
-interface LinkMetadata {
-  title?: string;
-  description?: string;
-  url: string;
-}
-
-async function fetchLinkMetadata(url: string): Promise<LinkMetadata> {
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-      },
-      signal: AbortSignal.timeout(10000), // 10 second timeout
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const html = await response.text();
-
-    // Extract Open Graph and Twitter metadata with more comprehensive patterns
-    const titleMatches = [
-      html.match(/<meta\s+property="og:title"\s+content="([^"]*)"[^>]*>/i),
-      html.match(/<meta\s+name="twitter:title"\s+content="([^"]*)"[^>]*>/i),
-      html.match(/<title[^>]*>([^<]*)<\/title>/i)
-    ];
-
-    const descriptionMatches = [
-      html.match(/<meta\s+property="og:description"\s+content="([^"]*)"[^>]*>/i),
-      html.match(/<meta\s+name="twitter:description"\s+content="([^"]*)"[^>]*>/i),
-      html.match(/<meta\s+name="description"\s+content="([^"]*)"[^>]*>/i)
-    ];
-
-    const titleMatch = titleMatches.find(match => match)?.[1];
-    const descriptionMatch = descriptionMatches.find(match => match)?.[1];
-
-    // For social media, prefer our custom title extraction over scraped titles
-    const isSocialMedia = url.includes('instagram.com') || url.includes('facebook.com') || url.includes('twitter.com') || url.includes('x.com');
-
-    let title: string;
-    if (isSocialMedia) {
-      title = getDomainTitle(url);
-    } else {
-      title = titleMatch?.trim() || getDomainTitle(url);
-      // Decode HTML entities
-      title = title.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
-        .replace(/&#x([a-f\d]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)))
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#039;/g, "'");
-    }
-
-    let description = descriptionMatch?.trim();
-    if (description) {
-      // Decode HTML entities in descriptions
-      description = description.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
-        .replace(/&#x([a-f\d]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)))
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#039;/g, "'");
-    }
-
-    return {
-      title,
-      description,
-      url
-    };
-  } catch (error) {
-    console.error(`Error fetching metadata for ${url}:`, error);
-    return {
-      title: getDomainTitle(url),
-      url
-    };
-  }
-}
-
-interface CachedLinkMetadata {
-  timestamp: number;
-  data: LinkMetadata[];
-}
-
-async function getCachedLinkMetadata(): Promise<LinkMetadata[] | null> {
-  try {
-    const { blobs } = await list({ prefix: 'link_metadata.json' });
-    if (blobs.length === 0) {
-      return null;
-    }
-
-    const response = await fetch(blobs[0].url);
-    const cached: CachedLinkMetadata = await response.json();
-
-    // Check if cache is expired (24 hours)
-    const cacheAge = Date.now() - cached.timestamp;
-    const maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-
-    if (cacheAge > maxAge) {
-      console.log('Link metadata cache expired');
-      return null;
-    }
-
-    console.log('Using cached link metadata');
-    return cached.data;
-  } catch (error) {
-    console.log('Failed to load cached link metadata:', error);
-    return null;
-  }
-}
-
-async function saveLinkMetadataCache(metadata: LinkMetadata[]): Promise<void> {
-  try {
-    const cacheData: CachedLinkMetadata = {
-      timestamp: Date.now(),
-      data: metadata
-    };
-
-    const json = JSON.stringify(cacheData);
-    await put('link_metadata.json', json, {
-      access: 'public',
-      contentType: 'application/json'
-    });
-
-    console.log('Saved link metadata cache');
-  } catch (error) {
-    console.log('Failed to save link metadata cache:', error);
-  }
-}
-
-function getDomainTitle(url: string): string {
-  try {
-    const urlObj = new URL(url);
-    const domain = urlObj.hostname.replace('www.', '');
-
-    // Extract usernames for social media platforms
-    if (domain.includes('facebook.com')) {
-      const match = url.match(/facebook\.com\/(@?[\w.]+)/);
-      if (match) {
-        const username = match[1].replace('@', '');
-        return `@${username} on Facebook`;
-      }
-    }
-
-    if (domain.includes('instagram.com')) {
-      const match = url.match(/(?:www\.)?instagram\.com\/(\w+)/);
-      if (match) {
-        return `@${match[1]} on Instagram`;
-      }
-    }
-
-    if (domain.includes('twitter.com') || domain.includes('x.com')) {
-      const match = url.match(/(?:twitter|x)\.com\/(\w+)/);
-      if (match) {
-        return `@${match[1]} on X`;
-      }
-    }
-
-    if (domain.includes('linkedin.com')) {
-      const match = url.match(/linkedin\.com\/in\/([^/?]+)/);
-      if (match) {
-        return `${match[1]} on LinkedIn`;
-      }
-    }
-
-    // Default to domain name
-    return domain.charAt(0).toUpperCase() + domain.slice(1);
-  } catch {
-    return url;
-  }
-}
+type LinkMetadata = typeof contentData['links'][number]
 
 function AddressDisplay({ addressData, accentColor }: {
   addressData: {
@@ -357,40 +166,12 @@ function AddressDisplay({ addressData, accentColor }: {
 }
 
 export default async function Home() {
-  const { dataUri, backgroundColor, textColor, accentColor } = await getPosterImageDataAndColors();
-  const contentData = await getContentData();
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "http";
 
-  // Fetch metadata for all links server-side with caching
-  let linkMetadata: LinkMetadata[] = [];
-
-  if (contentData?.links) {
-    // Try to load from cache first
-    const cachedMetadata = await getCachedLinkMetadata();
-
-    if (cachedMetadata && cachedMetadata.length === contentData.links.length) {
-      // Use cached data if available and matches current links count
-      linkMetadata = cachedMetadata;
-      console.log('Using cached link metadata');
-    } else {
-      // Fetch fresh data
-      console.log('Fetching fresh link metadata...');
-      const metadataPromises = contentData.links.map(async (link) => {
-        const normalized = typeof link === 'string' ? { url: link, title: undefined, description: undefined } : link
-        const scraped = await fetchLinkMetadata(normalized.url);
-
-        return {
-          title: normalized.title || scraped.title,
-          description: normalized.description || scraped.description,
-          url: normalized.url
-        };
-      });
-
-      linkMetadata = await Promise.all(metadataPromises);
-
-      // Save to cache
-      await saveLinkMetadataCache(linkMetadata);
-    }
-  }
+  const origin = `${proto}://${host}`;
+  const { backgroundColor, textColor, accentColor } = await getPosterImageColors(origin);
 
   return (
     <>
@@ -443,7 +224,7 @@ export default async function Home() {
             opacity: 0.8
           }} />
           <Image
-            src={dataUri}
+            src='/smushed_poster.png'
             alt="Smushed Blueberries Poster"
             width={800}
             height={1200}
@@ -464,7 +245,7 @@ export default async function Home() {
               )}
 
               {/* Links Section */}
-              {linkMetadata.length > 0 && (
+              {contentData.links.length > 0 && (
                 <div style={{ margin: '40px 0', width: '100%', maxWidth: '800px' }}>
                   <h3 style={{
                     margin: '0 0 20px 0',
@@ -480,7 +261,7 @@ export default async function Home() {
                     gap: '20px',
                     padding: '0 20px'
                   }}>
-                    {linkMetadata.map((metadata, index) => (
+                    {contentData.links.map((metadata, index) => (
                       <LinkPreviewCard
                         key={index}
                         metadata={metadata}

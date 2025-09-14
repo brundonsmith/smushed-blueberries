@@ -1,0 +1,42 @@
+{
+    "instagram": "smushedblueberries",
+    "links": [
+        {
+            "title": "Meg Jerit",
+            "description": "Writer, Educator, Community Organizer",
+            "url": "https://megjerit.com"
+        },
+        {
+            "title": "C.M. Moorhead",
+            "description": "Plays, screenplays, shorts, Op Eds, SEO articles, content writing, and more",
+            "url": "https://caitlynmoorhead.com"
+        },
+        {
+            "title": "Revamp Rob | The Austin Handyman, On Time Every Time!",
+            "description": "I pride myself on being quick and reliable. From quick fixes to full revamps I offer flexible pricing options that fit your needs. This includes painting, drywall, cabinetry, electrical switched, outlets, lighting, plumbing, door hanging, trim work, demo, framing more!",
+            "url": "https://revamprob.com"
+        },
+        {
+            "title": "Jess Hagemann",
+            "description": "Horror author, based in Austin TX",
+            "url": "https://jesshagemann.com"
+        },
+        {
+            "title": "Downstream Biodynamics",
+            "description": "Biodynamic Craniosacral / Somatic Therapy + Somatic Classes w/ Kadie Spinks, Austin, TX / Remote",
+            "url": "https://downstreambcst.com"
+        },
+        {
+            "title": "Irina Astra | MoonBird Poetry",
+            "description": "Irina Astra: writer | poet | dancer | creator",
+            "url": "https://facebook.com/@IrinaAstraMoonBirdPoerty"
+        }
+    ],
+    "address": {
+        "name": "Epoch Coffee",
+        "address": "2700 W Anderson Ln, Unit 409",
+        "city": "Austin",
+        "state": "TX",
+        "zip": "78757"
+    }
+}

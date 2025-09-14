@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Lora } from "next/font/google";
-import { getPosterUrl } from "./poster";
+import { headers } from "next/headers";
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -11,7 +11,10 @@ const lora = Lora({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const posterUrl = await getPosterUrl();
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  const posterURL = proto + '://' + host + '/smushed_poster.png'
   
   return {
     title: "Smushed Blueberries",
@@ -24,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description: "Stories, poems, and other juice - a creative writing community",
       images: [
         {
-          url: posterUrl,
+          url: posterURL,
           width: 800,
           height: 1200,
           alt: "Smushed Blueberries Poster"
@@ -36,7 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
       card: 'summary_large_image',
       title: "Smushed Blueberries",
       description: "Stories, poems, and other juice - a creative writing community",
-      images: [posterUrl],
+      images: [posterURL],
     }
   };
 }

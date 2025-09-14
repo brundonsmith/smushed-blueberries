@@ -1,4 +1,3 @@
-import { list } from '@vercel/blob';
 import sharp from 'sharp';
 
 function getContrastingColor(rgb: [number, number, number]): string {
@@ -104,43 +103,19 @@ async function extractEdgeColors(buffer: Buffer): Promise<[number, number, numbe
     }
 }
 
-export async function getPosterUrl(): Promise<string> {
-    const { blobs } = await list({ prefix: 'smushed_poster.png' });
-    return blobs[0]!.url;
-}
-
-export async function getPosterImageDataAndColors(): Promise<{ dataUri: string; backgroundColor: string; textColor: string; accentColor: string }> {
-    const start = Date.now()
-    const { blobs } = await list({ prefix: 'smushed_poster.png' });
-    const response = await fetch(blobs[0]!.url);
-    console.log('Poster image loaded in ' + (Date.now() - start) + 'ms')
-
-    const start2 = Date.now()
-    const arrayBuffer = await response.arrayBuffer();
+export async function getPosterImageColors(origin: string) {
+    const response = await fetch(origin + '/smushed_poster.png')
+    const arrayBuffer = await response.arrayBuffer()
     const imageBuffer = Buffer.from(arrayBuffer);
-    const contentType = response.headers.get('content-type') || 'image/png';
 
     // Extract colors from the image
     const backgroundColor = await extractEdgeColors(imageBuffer);
     const textColor = getContrastingColor(backgroundColor);
     const accentColor = getComplementaryAccent(backgroundColor);
 
-    // Cache the colors (but not the data URI since it's large)
-    const colorData = {
+    return {
         backgroundColor: `rgb(${backgroundColor.join(', ')})`,
         textColor,
         accentColor
-    };
-
-    // Color caching disabled
-
-    // Convert to data URI
-    const dataUri = `data:${contentType};base64,${imageBuffer.toString('base64')}`;
-
-    console.log('Poster image processed in ' + (Date.now() - start2) + 'ms')
-
-    return {
-        dataUri,
-        ...colorData
     };
 }
