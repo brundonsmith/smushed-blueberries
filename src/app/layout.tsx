@@ -14,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   const proto = h.get("x-forwarded-proto") ?? "http";
-  const posterURL = proto + '://' + host + '/smushed_poster.png'
+  const posterURL = proto + '://' + host + '/smushed_poster.jpeg'
   
   return {
     title: "Smushed Blueberries",

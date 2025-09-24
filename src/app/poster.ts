@@ -104,7 +104,7 @@ async function extractEdgeColors(buffer: Buffer): Promise<[number, number, numbe
 }
 
 export async function getPosterImageColors(origin: string) {
-    const response = await fetch(origin + '/smushed_poster.png')
+    const response = await fetch(origin + '/smushed_poster.jpeg')
     const arrayBuffer = await response.arrayBuffer()
     const imageBuffer = Buffer.from(arrayBuffer);
 
