@@ -224,7 +224,7 @@ export default async function Home() {
             opacity: 0.8
           }} />
           <Image
-            src='/smushed_poster.jpeg'
+            src='/smushed_poster.png'
             alt="Smushed Blueberries Poster"
             width={800}
             height={1200}
