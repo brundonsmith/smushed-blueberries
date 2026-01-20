@@ -73,6 +73,7 @@ async function extractEdgeColors(buffer: Buffer): Promise<[number, number, numbe
             try {
                 const cornerBuffer = await image
                     .extract(corner)
+                    .removeAlpha()
                     .raw()
                     .toBuffer();
 
